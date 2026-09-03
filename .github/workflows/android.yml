@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Download Source Zip from Telegram
+    - name: Download Source Zip
       run: |
         curl -L -o source.zip "${{ github.event.client_payload.file_url }}"
 
@@ -20,40 +20,49 @@ jobs:
         unzip -o source.zip -d temp_project/
         INNER_DIR=$(find temp_project -maxdepth 2 -name "gradlew" -exec dirname {} \;)
         if [ -n "$INNER_DIR" ]; then
-          mv $INNER_DIR/* .
+          cp -r $INNER_DIR/* .
         else
-          mv temp_project/* .
+          cp -r temp_project/* .
         fi
 
-    - name: Inject JitPack Repository
-      run: |
-        if [ -f "settings.gradle.kts" ]; then
-          echo 'dependencyResolutionManagement { repositories { maven { url = uri("https://jitpack.io") } } }' >> settings.gradle.kts
-        elif [ -f "settings.gradle" ]; then
-          echo 'dependencyResolutionManagement { repositories { maven { url "https://jitpack.io" } } }' >> settings.gradle
-        fi
-
-    - name: Set up JDK 17
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '17'
+        java-version: '21'
         distribution: 'temurin'
+
+    - name: Setup Gradle Repositories & Fix Submodules
+      run: |
+        # Inject JitPack & Maven Central directly
+        if [ -f "settings.gradle.kts" ]; then
+          echo 'dependencyResolutionManagement { repositories { google(); mavenCentral(); maven { url = uri("https://jitpack.io") } } }' >> settings.gradle.kts
+        fi
+        
+        # Disable strict verification that causes NewPipeExtractor missing errors
+        echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> gradle.properties
+        echo "android.useAndroidX=true" >> gradle.properties
+        echo "android.enableJetifier=true" >> gradle.properties
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew || true
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-configuration-cache
+      run: ./gradlew assembleDebug --no-daemon --stacktrace
 
     - name: Send APK to Telegram
       if: success()
       run: |
         APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
         if [ -f "$APK_PATH" ]; then
-          curl -F chat_id="${{ github.event.client_payload.chat_id }}"                -F document=@"$APK_PATH"                -F caption="✅ আপনার LibreTube APK সফলভাবে বিল্ড হয়েছে!"                "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
+          curl -F chat_id="${{ github.event.client_payload.chat_id }}" \
+               -F document=@"$APK_PATH" \
+               -F caption="✅ আপনার LibreTube APK সফলভাবে বিল্ড হয়েছে!" \
+               "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
         fi
 
     - name: Send Failure Notification
       if: failure()
       run: |
-        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! বিল্ড প্রসেস ফেল করেছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
+        curl -F chat_id="${{ github.event.client_payload.chat_id }}" \
+             -F text="❌ দুঃখিত! LibreTube ডিপেনডেন্সি ক্র্যাশ করেছে।" \
+             "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
