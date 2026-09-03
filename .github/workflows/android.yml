@@ -18,12 +18,19 @@ jobs:
       run: |
         mkdir temp_project
         unzip -o source.zip -d temp_project/
-        # মূল ফোল্ডার বের করা
         INNER_DIR=$(find temp_project -maxdepth 2 -name "gradlew" -exec dirname {} \;)
         if [ -n "$INNER_DIR" ]; then
           mv $INNER_DIR/* .
         else
           mv temp_project/* .
+        fi
+
+    - name: Inject JitPack Repository
+      run: |
+        if [ -f "settings.gradle.kts" ]; then
+          echo 'dependencyResolutionManagement { repositories { maven { url = uri("https://jitpack.io") } } }' >> settings.gradle.kts
+        elif [ -f "settings.gradle" ]; then
+          echo 'dependencyResolutionManagement { repositories { maven { url "https://jitpack.io" } } }' >> settings.gradle
         fi
 
     - name: Set up JDK 17
@@ -36,17 +43,17 @@ jobs:
       run: chmod +x gradlew || true
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      run: ./gradlew assembleDebug --no-configuration-cache
 
     - name: Send APK to Telegram
       if: success()
       run: |
         APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
         if [ -f "$APK_PATH" ]; then
-          curl -F chat_id="${{ github.event.client_payload.chat_id }}"                -F document=@"$APK_PATH"                -F caption="✅ আপনার অ্যান্ড্রয়েড APK সফলভাবে বিল্ড হয়েছে!"                "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
+          curl -F chat_id="${{ github.event.client_payload.chat_id }}"                -F document=@"$APK_PATH"                -F caption="✅ আপনার LibreTube APK সফলভাবে বিল্ড হয়েছে!"                "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
         fi
 
     - name: Send Failure Notification
       if: failure()
       run: |
-        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! বিল্ড প্রসেস ফেল করেছে। প্রজেক্ট সোর্স কোডে সমস্যা আছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
+        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! বিল্ড প্রসেস ফেল করেছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
