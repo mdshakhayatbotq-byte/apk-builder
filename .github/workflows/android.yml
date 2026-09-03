@@ -1,9 +1,8 @@
 name: Android CI Build
 
 on:
-  push:
-    paths:
-      - 'source.zip'
+  repository_dispatch:
+    types: [build-apk]
   workflow_dispatch:
 
 jobs:
@@ -11,8 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+    - name: Download Source Zip
+      run: |
+        curl -L -o source.zip "${{ github.event.client_payload.file_url }}"
 
     - name: Unzip Source Code
       run: |
@@ -43,27 +43,13 @@ jobs:
 
     - name: Send APK to Telegram
       if: success()
-      env:
-        BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
         APK_PATH=$(find project/ -type f -name "*.apk" | head -n 1)
         if [ -f "$APK_PATH" ]; then
-          curl -F chat_id="$CHAT_ID" \
-               -F document=@"$APK_PATH" \
-               -F caption="✅ আপনার অ্যান্ড্রয়েড APK সফলভাবে বিল্ড হয়েছে!" \
-               "https://api.telegram.org/bot$BOT_TOKEN/sendDocument"
-        else
-          echo "APK file not found!"
-          exit 1
+          curl -F chat_id="${{ github.event.client_payload.chat_id }}"                -F document=@"$APK_PATH"                -F caption="✅ আপনার অ্যান্ড্রয়েড APK সফলভাবে বিল্ড হয়েছে!"                "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
         fi
 
-    - name: Send Failure Notification to Telegram
+    - name: Send Failure Notification
       if: failure()
-      env:
-        BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
-        curl -F chat_id="$CHAT_ID" \
-             -F text="❌ দুঃখিত, আপনার প্রজেক্ট বিল্ড করতে সমস্যা হয়েছে! ক্র্যাশ বা এরর লগ চেক করুন।" \
-             "https://api.telegram.org/bot$BOT_TOKEN/sendMessage"
+        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! প্রজেক্ট বিল্ড করতে সমস্যা হয়েছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
