@@ -18,13 +18,22 @@ jobs:
       run: |
         mkdir temp
         unzip -q source.zip -d temp
-        # ফোল্ডারের ভেতর প্রজেক্ট থাকলে তা রুট ডিরেক্টরিতে আনবে
         ROOT_DIR=$(find temp -maxdepth 2 -name "gradlew" -exec dirname {} \;)
         if [ -n "$ROOT_DIR" ]; then
           cp -r $ROOT_DIR/* .
         else
           cp -r temp/* .
         fi
+
+    - name: Fix Missing NewPipeExtractor Submodule
+      run: |
+        # Checkout official extractor if missing locally
+        if [ ! -d "extractor" ]; then
+          git clone --depth 1 https://github.com/libre-tube/NewPipeExtractor.git extractor || true
+        fi
+        
+        # Override repositories to force Maven Central Jitpack fallback
+        echo 'allprojects { repositories { google(); mavenCentral(); maven { url "https://jitpack.io" } } }' >> build.gradle || true
 
     - name: Set up JDK 17
       uses: actions/setup-java@v4
@@ -36,7 +45,7 @@ jobs:
       run: chmod +x gradlew || true
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon
+      run: ./gradlew assembleDebug --no-daemon --no-configuration-cache
 
     - name: Send APK to Telegram
       if: success()
@@ -53,5 +62,5 @@ jobs:
       if: failure()
       run: |
         curl -F chat_id="${{ github.event.client_payload.chat_id }}" \
-             -F text="❌ দুঃখিত! প্রজেক্ট বিল্ড করতে সমস্যা হয়েছে।" \
+             -F text="❌ দুঃখিত! প্রজেক্ট ডিপেনডেন্সি অমিলের কারণে বিল্ড ফেল করেছে।" \
              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
