@@ -45,7 +45,9 @@ jobs:
           curl -F chat_id="${{ github.event.client_payload.chat_id }}" \
                -F document=@"$APK_PATH" \
                -F caption="✅ আপনার LibreTube APK সফলভাবে তৈরি হয়েছে!" \
-               "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
+               "https://api.telegram.org/bot8030009957:AAEyJvcLsr4GVYWGrE45PRnMz7Rp_nU3QLg/sendDocument"
+        else
+          echo "No APK found"
         fi
 
     - name: Send Failure Notification
@@ -53,4 +55,4 @@ jobs:
       run: |
         curl -F chat_id="${{ github.event.client_payload.chat_id }}" \
              -F text="❌ দুঃখিত! বিল্ড ব্যর্থ হয়েছে।" \
-             "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
+             "https://api.telegram.org/bot8030009957:AAEyJvcLsr4GVYWGrE45PRnMz7Rp_nU3QLg/sendMessage"
