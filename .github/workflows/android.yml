@@ -18,7 +18,6 @@ jobs:
       run: |
         mkdir temp_extract
         unzip -o source.zip -d temp_extract/
-        # জিপের ভেতরে কোনো সাব-ফোল্ডার থাকলে তা থেকে প্রজেক্ট ফাইলগুলো মূল project ফোল্ডারে নিয়ে আসা
         INNER_DIR=$(find temp_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)
         if [ -n "$INNER_DIR" ]; then
           mv "$INNER_DIR" project
