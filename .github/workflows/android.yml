@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
     - name: Download Source Zip
       run: |
         curl -L -o source.zip "${{ github.event.client_payload.file_url }}"
@@ -20,31 +23,27 @@ jobs:
         unzip -o source.zip -d temp_extract/
         INNER_DIR=$(find temp_extract -mindepth 1 -maxdepth 1 -type d | head -n 1)
         if [ -n "$INNER_DIR" ]; then
-          mv "$INNER_DIR" project
+          cp -r "$INNER_DIR"/* .
         else
-          mv temp_extract project
+          cp -r temp_extract/* .
         fi
 
     - name: Set up JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
         distribution: 'temurin'
 
     - name: Grant execute permission for gradlew
-      run: |
-        cd project
-        chmod +x gradlew || true
+      run: chmod +x gradlew || true
 
     - name: Build Debug APK
-      run: |
-        cd project
-        ./gradlew assembleDebug
+      run: ./gradlew assembleDebug
 
     - name: Send APK to Telegram
       if: success()
       run: |
-        APK_PATH=$(find project/ -type f -name "*.apk" | head -n 1)
+        APK_PATH=$(find . -type f -name "*.apk" | head -n 1)
         if [ -f "$APK_PATH" ]; then
           curl -F chat_id="${{ github.event.client_payload.chat_id }}"                -F document=@"$APK_PATH"                -F caption="✅ আপনার অ্যান্ড্রয়েড APK সফলভাবে বিল্ড হয়েছে!"                "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
         fi
@@ -52,4 +51,4 @@ jobs:
     - name: Send Failure Notification
       if: failure()
       run: |
-        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! প্রজেক্ট বিল্ড করতে সমস্যা হয়েছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
+        curl -F chat_id="${{ github.event.client_payload.chat_id }}"              -F text="❌ দুঃখিত! বিল্ড প্রসেসে সমস্যা হয়েছে। প্রজেক্ট স্ট্রাকচার বা কোডে কোনো এরর রয়েছে।"              "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendMessage"
